@@ -1,0 +1,22 @@
+{
+  "name": "proactive-qbo-psc",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "15.5.7",
+    "react": "19.1.4",
+    "react-dom": "19.1.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "typescript": "^5.7.2"
+  },
+  "comment": "Pinned to React2Shell-patched releases: Next 15.5.7 (CVE-2025-66478) and React 19.1.4 (CVE-2025-55182, plus CVE-2025-55183 and CVE-2025-55184). Do not downgrade — Vercel blocks deployment of vulnerable versions."
+}
