@@ -19,8 +19,9 @@ export default function Launch() {
 
       <h2>If you are an accounting user</h2>
       <p>
-        You do not need to sign in here. Your connector was added to your Claude account by the
-        project owner. Ask in Claude, for example: <em>&ldquo;show me open reconciliation
+        You use this through Claude. In Claude, open Settings &rarr; Connectors, click
+        <strong>Connect</strong> on the QuickBooks connector, and sign in with the email and
+        password issued to you by the project owner. Your actions are recorded under your name. Ask in Claude, for example: <em>&ldquo;show me open reconciliation
         exceptions for PSC&rdquo;</em> or upload an approved supplier invoice and ask for it to be
         entered as a bill.
       </p>

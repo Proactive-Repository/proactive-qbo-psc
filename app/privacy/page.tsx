@@ -68,8 +68,10 @@ export default function Privacy() {
 
       <h2>Access control</h2>
       <p>
-        Each user holds an individual credential. Credentials are stored only as a SHA-256 hash,
-        are revocable individually, and are withdrawn when a person changes role or leaves.
+        Each user signs in with an individual email and password issued by Proactive, optionally
+        with an authenticator-app code; passwords are stored only as salted scrypt hashes and
+        session tokens only as SHA-256 hashes. Accounts lock after repeated failed attempts, are
+        revocable individually, and are withdrawn when a person changes role or leaves.
         Encryption keys are held in the hosting environment&rsquo;s secret store and never in
         source code or the database.
       </p>

@@ -41,9 +41,9 @@ export default function Reconnect() {
 
       <h2>If you are an accounting user</h2>
       <p>
-        You do not need to connect anything. You use this through Claude, with your own
-        credential. If a tool reports that a company file is not connected, contact the project
-        owner.
+        You do not need to connect a company file. In Claude, click <strong>Connect</strong> on
+        the QuickBooks connector and sign in with your own Proactive connector email and password.
+        If a tool reports that a company file is not connected, contact the project owner.
       </p>
 
       <div className="note">

@@ -59,7 +59,21 @@ https://<vercel-url>/connect?file=PSC&key=<ADMIN_KEY>
 
 The callback records the realm id and marks PSC `authorised`. Writes stay off.
 
-## 7. Credentials (Claude, via admin endpoint)
+## 7. People (sign-in accounts)
+
+Create each person; hand them their one-time link (24h); they set their own password.
+
+```
+POST https://<vercel-url>/api/admin/user?key=<ADMIN_KEY>
+{ "full_name": "Michael Mancuso", "email": "michael@proactivegroup.ca", "role": "admin" }
+{ "full_name": "Manpreet Kaur",   "email": "mkaur@proactivegroup.ca",   "role": "approver" }
+```
+
+Then ONE connector in Claude → Admin settings → Connectors → Add custom connector:
+name `PSC QuickBooks`, URL `https://<vercel-url>/api/mcp`, leave OAuth client fields blank,
+Managed authorization off. Each person clicks Connect and signs in.
+
+## 7 (old). URL credentials — retired
 
 ```
 POST https://<vercel-url>/api/admin/user?key=<ADMIN_KEY>

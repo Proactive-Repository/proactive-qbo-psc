@@ -35,6 +35,29 @@ logged as `unexpected_drift` and reported.
 Nothing in this repository can void or delete a record, change an existing bill's amount,
 vendor or account, or initiate a payment.
 
+## Sign-in
+
+People do not hold URL credentials any more. Claude connects to `/api/mcp`, gets a 401 with an
+RFC 9728 pointer, discovers the authorization server (`/.well-known/oauth-authorization-server`),
+registers itself, and sends the person to `/api/oauth/authorize` to sign in with their Proactive
+connector email and password (plus an authenticator code if `mfa_required`). Only emails in
+`connector_user` can sign in. Tokens are opaque and stored hashed.
+
+Managing people (ADMIN_KEY):
+
+```
+POST /api/admin/user?key=ADMIN_KEY
+{ "full_name": "Manpreet Kaur", "email": "mkaur@proactivegroup.ca", "role": "approver", "mfa_required": false }
+  -> { setup_link: "https://.../auth/setup?token=...", expires_in_hours: 24 }
+{ "email": "...", "reset": true }              -> new set-password link
+{ "email": "...", "mfa_required": true }        -> require authenticator code
+{ "email": "...", "revoke": true }              -> deactivate + revoke all tokens
+```
+
+In Claude (org admin): Connectors → Add custom connector → name `PSC QuickBooks`, URL
+`https://<host>/api/mcp`, no client id/secret, Managed authorization off. Anyone who can see it
+can click Connect; only people in `connector_user` get past the sign-in page.
+
 ## Enabling writes
 
 ```
@@ -51,7 +74,8 @@ POST /api/admin/enable-writes?key=ADMIN_KEY
 app/                   public pages Intuit requires + OAuth + MCP endpoint
   connect/             GET /connect?file=PSC&key=ADMIN_KEY — starts Intuit consent (admin only)
   api/qbo/callback/    Intuit redirect target
-  api/mcp/[token]/     the MCP endpoint — one URL per person
+  api/mcp/             the MCP endpoint (bearer token from sign-in)
+  api/mcp/[token]/     LEGACY per-person URL — 410 unless ALLOW_LEGACY_TOKENS=true
   api/admin/user/      mint/revoke a person's connector credential (ADMIN_KEY)
   api/admin/enable-writes/   grant/revoke write scopes per file (ADMIN_KEY)
   api/admin/reset-realm/     clear a company-file mapping (ADMIN_KEY)
@@ -60,6 +84,11 @@ lib/bills.ts           PSC AP: accounts, tax codes, vendor history, create_bill
 lib/write.ts           set_invoice_number (carrier recon)
 lib/recon.ts           MX carrier payables matching logic
 lib/tools.ts           the tools Claude sees
+lib/auth.ts            sign-in: passwords, TOTP, OAuth codes/tokens, client registration
+lib/mcp.ts             JSON-RPC handler shared by /api/mcp (bearer) and the legacy token route
+lib/html.ts            server-rendered sign-in / set-up pages
+app/api/oauth/*        metadata, resource, register, authorize, token, revoke
+app/auth/setup/        one-time set-password page
 supabase/schema.sql    schema for the new Supabase project (run once)
 SETUP.md               deployment runbook
 ```
