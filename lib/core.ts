@@ -1,3 +1,4 @@
+import { PROJECT_CODE } from "./brand";
 /**
  * QBO-02 connector (PSC) — core services.
  * Reads are unrestricted. The single write path is qboPost, which is gated on
@@ -381,7 +382,7 @@ export function scopeError(realm: Realm, scope: WriteScope) {
     return `Writes are not enabled for ${realm.label}. An administrator must enable them for this company file before anything can be changed in QuickBooks.`;
   return `${realm.label} is not enabled for "${scope}". Enabled scopes: ${
     (realm.write_scope ?? []).join(", ") || "none"
-  }. An administrator must grant this scope for the company file; it is a logged decision under charter QBO-02.`;
+  }. An administrator must grant this scope for the company file; it is a logged decision under charter ${PROJECT_CODE}.`;
 }
 
 export async function qboPost(

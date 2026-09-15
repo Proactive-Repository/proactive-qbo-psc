@@ -1,10 +1,11 @@
+import { LABEL, PROJECT_CODE } from "@/lib/brand";
 export const dynamic = "force-dynamic";
 
 export default function Launch() {
   return (
     <>
       <h1>Proactive QuickBooks Connector</h1>
-      <p className="sub">Internal application · Project QBO-02 (PSC)</p>
+      <p className="sub">Internal application · Project {PROJECT_CODE} ({LABEL})</p>
 
       <p>
         This application has no user interface of its own. Authorised Proactive accounting staff
@@ -22,7 +23,7 @@ export default function Launch() {
         You use this through Claude. In Claude, open Settings &rarr; Connectors, click
         <strong>Connect</strong> on the QuickBooks connector, and sign in with the email and
         password issued to you by the project owner. Your actions are recorded under your name. Ask in Claude, for example: <em>&ldquo;show me open reconciliation
-        exceptions for PSC&rdquo;</em> or upload an approved supplier invoice and ask for it to be
+        exceptions for {LABEL}&rdquo;</em> or upload an approved supplier invoice and ask for it to be
         entered as a bill.
       </p>
 

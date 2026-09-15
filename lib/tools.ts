@@ -1,3 +1,4 @@
+import { LABEL } from "./brand";
 /**
  * MCP tools exposed to Claude (QBO-02, PSC).
  *
@@ -674,7 +675,7 @@ export const TOOLS: {
     inputSchema: {
       type: "object",
       properties: {
-        file: { type: "string", description: "Company file label, e.g. PSC" },
+        file: { type: "string", description: `Company file label, e.g. ${LABEL}` },
         vendor_id: { type: "string", description: "QuickBooks vendor Id (from list_vendors)" },
         doc_number: { type: "string", description: "The supplier's invoice number, exactly as printed" },
         txn_date: { type: "string", description: "Invoice date YYYY-MM-DD" },

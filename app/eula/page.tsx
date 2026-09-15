@@ -1,3 +1,4 @@
+import { PROJECT_CODE } from "@/lib/brand";
 export default function Eula() {
   return (
     <>
@@ -30,7 +31,7 @@ export default function Eula() {
       <p>
         It does not void or delete records, does not change an existing bill&rsquo;s amount,
         vendor or account, and cannot initiate a payment of any kind. Extending this scope requires
-        written approval from the executive sponsor of project QBO-02 and a corresponding
+        written approval from the executive sponsor of project {PROJECT_CODE} and a corresponding
         disclosure to Intuit.
       </p>
 

@@ -1,8 +1,9 @@
+import { LABEL, PROJECT_CODE } from "@/lib/brand";
 export default function Privacy() {
   return (
     <>
       <h1>Privacy Policy</h1>
-      <p className="sub">Proactive PSC QuickBooks Connector (QBO-02) · Last updated September 2026</p>
+      <p className="sub">Proactive {LABEL} QuickBooks Connector ({PROJECT_CODE}) · Last updated September 2026</p>
 
       <h2>Who we are</h2>
       <p>

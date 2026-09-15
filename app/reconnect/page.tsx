@@ -1,10 +1,11 @@
+import { LABEL, PROJECT_CODE } from "@/lib/brand";
 export const dynamic = "force-dynamic";
 
 export default function Reconnect() {
   return (
     <>
       <h1>Connecting or reconnecting a company file</h1>
-      <p className="sub">Proactive PSC QuickBooks Connector · Project QBO-02</p>
+      <p className="sub">Proactive {LABEL} QuickBooks Connector · Project {PROJECT_CODE}</p>
 
       <p>
         This application is connected to a QuickBooks company file by a QuickBooks administrator,

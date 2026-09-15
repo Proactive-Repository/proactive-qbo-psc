@@ -1,17 +1,18 @@
+import { DIVISION, LABEL, PROJECT_CODE } from "@/lib/brand";
 export const dynamic = "force-dynamic";
 
 export default function Home() {
   return (
     <>
-      <h1>Proactive PSC QuickBooks Connector</h1>
+      <h1>Proactive {LABEL} QuickBooks Connector</h1>
       <p className="sub">
-        Internal application · Proactive Supply Chain Solutions (PSC) · Project QBO-02
+        Internal application · {DIVISION} ({LABEL}) · Project {PROJECT_CODE}
       </p>
 
       <p>
         This application connects Proactive Supply Chain Group&rsquo;s own QuickBooks Online
-        company file for Proactive Supply Chain Solutions (PSC) to Proactive&rsquo;s internal
-        finance tooling. It is used by PSC accounting staff to enter approved supplier invoices as
+        company file for {DIVISION} ({LABEL}) to Proactive&rsquo;s internal
+        finance tooling. It is used by {LABEL} accounting staff to enter approved supplier invoices as
         bills in QuickBooks, and to reconcile carrier invoices against recorded bills.
       </p>
 

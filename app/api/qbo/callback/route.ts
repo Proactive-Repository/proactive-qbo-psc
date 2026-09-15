@@ -1,3 +1,4 @@
+import { PROJECT_CODE } from "@/lib/brand";
 /**
  * Intuit redirects here after a QuickBooks administrator authorises a company file.
  */
@@ -11,7 +12,7 @@ function page(title: string, body: string, status = 200) {
      <title>${title}</title>
      <body style="font:16px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;max-width:640px;margin:64px auto;padding:0 24px;color:#222">
      <h1 style="color:#1F3557;font-size:24px">${title}</h1>${body}
-     <p style="margin-top:40px;color:#5A6472;font-size:13px">Proactive Supply Chain Group · QBO-02</p></body>`,
+     <p style="margin-top:40px;color:#5A6472;font-size:13px">Proactive Supply Chain Group · ${PROJECT_CODE}</p></body>`,
     { status, headers: { "content-type": "text/html; charset=utf-8" } },
   );
 }

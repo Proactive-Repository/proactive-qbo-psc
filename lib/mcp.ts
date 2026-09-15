@@ -1,3 +1,4 @@
+import { LABEL, PROJECT_CODE, SERVER_NAME } from "@/lib/brand";
 /** JSON-RPC handling for the MCP endpoint, shared by the bearer route and the legacy token route. */
 import { TOOLS, TOOL_MAP } from "@/lib/tools";
 import { ConnectorUser, audit } from "@/lib/core";
@@ -13,7 +14,7 @@ export const json = (body: unknown, status = 200, headers: Record<string, string
 const rpcError = (id: any, code: number, message: string) => json({ jsonrpc: "2.0", id: id ?? null, error: { code, message } });
 
 export const INSTRUCTIONS =
-  "Proactive's QuickBooks Online connector for PSC (project QBO-02). Reads vendors, bills, " +
+  `Proactive's QuickBooks Online connector for ${LABEL} (project ${PROJECT_CODE}). Reads vendors, bills, ` +
   "chart of accounts and tax codes. Exactly two tools change QuickBooks: set_invoice_number " +
   "(document number + memo on one existing bill) and create_bill (one new vendor bill from an " +
   "approved invoice). Both default to a dry run and need apply:true. For create_bill: always " +
@@ -45,7 +46,7 @@ export async function handleRpc(req: Request, user: ConnectorUser): Promise<Resp
           result: {
             protocolVersion: PROTOCOL,
             capabilities: { tools: { listChanged: false } },
-            serverInfo: { name: "proactive-qbo-psc", version: "0.3.0" },
+            serverInfo: { name: SERVER_NAME, version: "0.3.1" },
             instructions: INSTRUCTIONS + ` You are signed in as ${user.full_name} (${user.email}), role ${user.role}.`,
           },
         });

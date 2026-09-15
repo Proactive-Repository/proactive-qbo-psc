@@ -1,7 +1,8 @@
+import { DIVISION, LABEL, PROJECT_CODE } from "@/lib/brand";
+
 export const metadata = {
-  title: "Proactive PSC · QuickBooks Connector",
-  description:
-    "Internal QuickBooks Online connector for Proactive Supply Chain Solutions (PSC). Not a public service.",
+  title: `Proactive ${LABEL} · QuickBooks Connector`,
+  description: `Internal QuickBooks Online connector for ${DIVISION} (${LABEL}). Not a public service.`,
 };
 
 const css = `
@@ -30,7 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main>
           {children}
           <footer>
-            Proactive Supply Chain Group · Internal application (QBO-02, PSC). Access is restricted to
+            Proactive Supply Chain Group · Internal application ({PROJECT_CODE}, {LABEL}). Access is restricted to
             authorised Proactive staff. Enquiries: michael@proactivegroup.ca
           </footer>
         </main>

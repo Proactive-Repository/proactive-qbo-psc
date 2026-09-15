@@ -1,7 +1,7 @@
 /** Server-rendered pages for sign-in and account setup. No client JS. */
 
-export const BRAND = process.env.APP_BRAND ?? "Proactive PSC · QuickBooks Connector";
-export const PROJECT_CODE = process.env.APP_PROJECT_CODE ?? "QBO-02";
+import { BRAND, PROJECT_CODE } from "./brand";
+export { BRAND, PROJECT_CODE };
 
 const CSS = `
 :root{--navy:#1F3557;--grey:#5A6472;--rule:#C9D2DC;--bg:#F6F8FA;--body:#222;--err:#A33A2B;--ok:#2E6B3A}
