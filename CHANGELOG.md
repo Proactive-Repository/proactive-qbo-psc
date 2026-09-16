@@ -1,5 +1,14 @@
 # Changelog
 
+## 16 September 2026 — financial reporting (v0.4.0)
+
+Read-only tools for management reporting and consolidation: `run_report` (any QuickBooks
+report, flattened to a table), `financial_package` (P&L, balance sheet, cash flow for a period as
+normalised lines + totals + company facts + intercompany-looking accounts flagged for review),
+`query_records` (guarded SELECT over common entities), `fx_rate` (QuickBooks' rate table),
+`company_info`. No new write paths; no Intuit declaration change (reads were always declared).
+
+
 ## 15 September 2026 — connector sign-in (v0.3.0)
 
 - **People sign in; URLs are no longer credentials.** The connector is now an OAuth 2.1

@@ -22,7 +22,7 @@ export const INSTRUCTIONS =
   "confirmed by the user; apply only after the user types 'post to qbo'; never override a " +
   "possible-duplicate flag without the user confirming it is a different invoice. Nothing " +
   "here can void or delete a record, edit an existing bill's amount or vendor, or pay anything. " +
-  "Start with company_files to see which company files are authorised. " +
+  "Reporting: run_report (any QuickBooks report), financial_package (normalised P&L/BS/CF for consolidation), query_records (filtered raw records), fx_rate, company_info — all read only. Start with company_files to see which company files are authorised. " +
   "Remember that a QuickBooks vendor's currency is fixed at creation, so a carrier " +
   "billing in both CAD and USD has two vendor records; always match on carrier AND " +
   "currency together.";
@@ -46,7 +46,7 @@ export async function handleRpc(req: Request, user: ConnectorUser): Promise<Resp
           result: {
             protocolVersion: PROTOCOL,
             capabilities: { tools: { listChanged: false } },
-            serverInfo: { name: SERVER_NAME, version: "0.3.1" },
+            serverInfo: { name: SERVER_NAME, version: "0.4.0" },
             instructions: INSTRUCTIONS + ` You are signed in as ${user.full_name} (${user.email}), role ${user.role}.`,
           },
         });

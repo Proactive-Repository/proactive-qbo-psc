@@ -42,6 +42,8 @@ import {
   saveRun,
 } from "./recon";
 import { setInvoiceNumber } from "./write";
+import { REPORTS, QUERYABLE, companyInfo, financialPackage, fxRate, projectRecord, queryRecords, rowsToMarkdown, runReport } from "./reports";
+
 
 type Ctx = { user: ConnectorUser };
 type Handler = (args: any, ctx: Ctx) => Promise<string>;
@@ -789,6 +791,121 @@ export const TOOLS: {
           Drift: b.drift ? "YES — check" : "",
         })),
       )}`;
+    },
+  },
+
+
+  /* ---------------------------------------------------- financial reporting (read only) */
+
+  {
+    name: "company_info",
+    description: "Legal name, country, home currency, fiscal year start and default accounting basis of a company file. Read only.",
+    inputSchema: { type: "object", properties: { file: { type: "string" } }, required: ["file"] },
+    handler: async ({ file }, { user }) => {
+      const r = await realmOf(file);
+      const info = await companyInfo(r, user.email);
+      await audit({ realm: r.id, kind: "read", operator: user.email, tool: "company_info" });
+      return "```json\n" + JSON.stringify(info, null, 2) + "\n```" + READ_ONLY_BANNER;
+    },
+  },
+
+  {
+    name: "run_report",
+    description:
+      "Run any QuickBooks financial report on a company file and return it as a table: ProfitAndLoss, ProfitAndLossDetail, BalanceSheet, CashFlow, TrialBalance, GeneralLedger, AgedPayables(Detail), AgedReceivables(Detail), TransactionList, VendorExpenses, CustomerIncome, CustomerBalance, VendorBalance, AccountList, TaxSummary. Dates YYYY-MM-DD, or a date_macro such as 'This Fiscal Year-to-date', 'Last Month', 'Last Fiscal Quarter'. summarize_column_by Month/Quarter/Year gives period columns. Read only.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file: { type: "string" },
+        report: { type: "string", enum: [...REPORTS] },
+        start_date: { type: "string" },
+        end_date: { type: "string" },
+        date_macro: { type: "string" },
+        accounting_method: { type: "string", enum: ["Accrual", "Cash"] },
+        summarize_column_by: { type: "string", enum: ["Total", "Month", "Quarter", "Year", "Customers", "Vendors", "Classes", "Departments"] },
+        customer: { type: "string", description: "Customer Id filter (detail/aging reports)" },
+        vendor: { type: "string", description: "Vendor Id filter" },
+        account: { type: "string", description: "Account Id filter (GeneralLedger, TransactionList)" },
+        classid: { type: "string" },
+        department: { type: "string" },
+        raw: { type: "boolean", description: "Also return the flattened rows as JSON for further calculation" },
+      },
+      required: ["file", "report"],
+    },
+    handler: async (a, { user }) => {
+      const r = await realmOf(a.file);
+      const { raw: _raw, file: _f, report, ...params } = a;
+      const res = await runReport(r, report, params, user.email);
+      await audit({ realm: r.id, kind: "read", operator: user.email, tool: "run_report", detail: { report, params, rows: res.rows.length } });
+      const h = res.header;
+      const head = `**${r.label} — ${h.ReportName ?? report}** · ${h.StartPeriod ?? ""}${h.EndPeriod ? " to " + h.EndPeriod : ""} · ${h.ReportBasis ?? ""} · ${res.currency ?? ""}`;
+      const table = rowsToMarkdown(res.columns, res.rows);
+      const json = a.raw ? "\n\n```json\n" + JSON.stringify({ columns: res.columns, rows: res.rows }) + "\n```" : "";
+      return `${head}\n\n${table}${json}${READ_ONLY_BANNER}`;
+    },
+  },
+
+  {
+    name: "financial_package",
+    description:
+      "One call per company file for consolidation: P&L (optionally by month), Balance Sheet and Cash Flow for a period, returned as normalised lines {statement, section, account, amount, currency} plus headline totals, company facts (home currency, country) and a list of intercompany-looking accounts flagged for review (never eliminated automatically). Use the same period on every division's connector, then combine. Read only.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file: { type: "string" },
+        start_date: { type: "string", description: "YYYY-MM-DD" },
+        end_date: { type: "string", description: "YYYY-MM-DD" },
+        accounting_method: { type: "string", enum: ["Accrual", "Cash"] },
+        by_month: { type: "boolean", description: "P&L with a column per month" },
+        detail: { type: "boolean", description: "Include every account line (default: totals + intercompany candidates only, to keep the reply short)" },
+      },
+      required: ["file", "start_date", "end_date"],
+    },
+    handler: async (a, { user }) => {
+      const r = await realmOf(a.file);
+      const pkg = await financialPackage(r, { start_date: a.start_date, end_date: a.end_date, accounting_method: a.accounting_method, by_month: a.by_month === true }, user.email);
+      await audit({ realm: r.id, kind: "read", operator: user.email, tool: "financial_package", detail: { period: pkg.period, lines: pkg.lines.length } });
+      const out: any = { company: pkg.company, period: pkg.period, totals: pkg.totals, intercompany_candidates: pkg.intercompany_candidates };
+      if (a.detail !== false) out.lines = pkg.lines;
+      return "```json\n" + JSON.stringify(out) + "\n```" + READ_ONLY_BANNER;
+    },
+  },
+
+  {
+    name: "fx_rate",
+    description: "QuickBooks' own exchange rate table: how many units of this file's home currency one unit of `currency` is worth on `date`. Use a CAD-home file (e.g. PSC) to translate a USD division into CAD at period end. Read only.",
+    inputSchema: { type: "object", properties: { file: { type: "string" }, currency: { type: "string", description: "e.g. USD" }, date: { type: "string", description: "YYYY-MM-DD" } }, required: ["file", "currency", "date"] },
+    handler: async ({ file, currency, date }, { user }) => {
+      const r = await realmOf(file);
+      const rate = await fxRate(r, String(currency).toUpperCase(), String(date), user.email);
+      await audit({ realm: r.id, kind: "read", operator: user.email, tool: "fx_rate", detail: { currency, date, rate } });
+      if (rate === null) return `No QuickBooks rate found on ${r.label} for ${currency} on ${date}. Try the nearest prior business day, or state a rate explicitly.`;
+      return `1 ${String(currency).toUpperCase()} = ${rate} ${r.home_currency ?? "home currency"} on ${date} (QuickBooks rate table, ${r.label}).${READ_ONLY_BANNER}`;
+    },
+  },
+
+  {
+    name: "query_records",
+    description:
+      "Pull raw records from a company file with a filter: Invoice, Bill, Payment, BillPayment, JournalEntry, Deposit, Purchase, Customer, Vendor, Account, Item and others. `where` uses QuickBooks query syntax, e.g. \"TxnDate >= '2026-07-01' and TotalAmt > 10000\" or \"VendorRef = '18582'\". Returns a compact table (and JSON if raw=true). SELECT only; nothing is changed.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file: { type: "string" },
+        entity: { type: "string", enum: [...QUERYABLE] },
+        where: { type: "string" },
+        limit: { type: "number", description: "max rows, default 200, max 1000" },
+        raw: { type: "boolean" },
+      },
+      required: ["file", "entity"],
+    },
+    handler: async ({ file, entity, where, limit, raw }, { user }) => {
+      const r = await realmOf(file);
+      const { sql, rows } = await queryRecords(r, String(entity), String(where ?? ""), Number(limit ?? 200), user.email);
+      await audit({ realm: r.id, kind: "read", operator: user.email, tool: "query_records", detail: { sql, returned: rows.length } });
+      const disp = rows.slice(0, Number(limit ?? 200)).map((x: any) => projectRecord(String(entity), x));
+      const total = rows.reduce((s: number, x: any) => s + (Number(x.TotalAmt ?? x.Amount) || 0), 0);
+      return `**${r.label}** · \`${sql}\` · ${rows.length} record(s)${total ? ` · sum ${money(total)}` : ""}\n\n${table(disp)}${raw ? "\n\n```json\n" + JSON.stringify(rows) + "\n```" : ""}${READ_ONLY_BANNER}`;
     },
   },
 
