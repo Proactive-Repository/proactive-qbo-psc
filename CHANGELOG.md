@@ -1,5 +1,12 @@
 # Changelog
 
+## 21 September 2026 — US tax model for create_bill (v0.4.1)
+
+`create_bill` detects a US company file (CompanyInfo.Country = US) and omits per-line
+`TaxCodeRef` and `GlobalTaxCalculation`, which QuickBooks US rejects. `tax_code` is now optional
+on a line and ignored on US files; still required on Canadian files. Needed for PGU and PLX.
+
+
 ## 16 September 2026 — financial reporting (v0.4.0)
 
 Read-only tools for management reporting and consolidation: `run_report` (any QuickBooks

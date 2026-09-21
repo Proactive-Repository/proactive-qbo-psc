@@ -177,7 +177,7 @@ export type BillLineIn = {
   description: string;
   amount: number;
   account: string; // id, number, or full name
-  tax_code: string; // TaxCode id or name
+  tax_code?: string; // TaxCode id or name — REQUIRED on Canadian/UK/AU files, ignored on US files
 };
 
 export type CreateBillArgs = {
@@ -238,9 +238,21 @@ export async function createBill(
       `Vendor "${vendor.DisplayName}" is a ${vendorCcy} vendor but the invoice is ${currency}. A QuickBooks vendor's currency is fixed; use the ${currency} vendor record or say the invoice currency is ${vendorCcy}.`,
     );
 
+  /* --- tax model: US files have no per-line tax code; the invoice's sales tax is part of the line amount --- */
+  let usTaxModel = false;
+  let home = realm.home_currency ?? "";
+  try {
+    const prefs = await getPreferences(realm, operator);
+    if (prefs.home_currency) home = prefs.home_currency;
+    usTaxModel = (prefs as any).country === "US" || realm.country === "US";
+  } catch {
+    usTaxModel = realm.country === "US";
+  }
+  if (!home) return refused(a, "Could not determine the company file's home currency.");
+
   /* --- accounts + tax --- */
   const accounts = await loadAccounts(realm, operator);
-  const taxCodes = await loadTaxCodes(realm, operator);
+  const taxCodes = usTaxModel ? [] : await loadTaxCodes(realm, operator);
   const lineOut: any[] = [];
   const problems: string[] = [];
   let subtotal = 0;
@@ -260,26 +272,25 @@ export async function createBill(
       );
     }
     const tcRef = String(l.tax_code ?? "").trim().toLowerCase();
-    const tc = taxCodes.find((t) => t.id === tcRef || t.name.toLowerCase() === tcRef);
-    if (!tc) problems.push(`Line ${i + 1}: tax code "${l.tax_code}" not found. Use list_tax_codes.`);
-    if (account && tc) {
+    const tc = usTaxModel ? null : taxCodes.find((t) => t.id === tcRef || t.name.toLowerCase() === tcRef);
+    if (!usTaxModel && !tc) problems.push(`Line ${i + 1}: tax code "${l.tax_code}" not found. Use list_tax_codes.`);
+    if (account && (usTaxModel || tc)) {
       const amt = round2(Number(l.amount));
       subtotal += amt;
-      tax += amt * (tc.purchase_rate_pct / 100);
+      if (tc) tax += amt * (tc.purchase_rate_pct / 100);
+      const detail: Record<string, unknown> = { AccountRef: { value: account.Id, name: account.FullyQualifiedName } };
+      if (tc) detail.TaxCodeRef = { value: tc.id };
       lineOut.push({
         DetailType: "AccountBasedExpenseLineDetail",
         Amount: amt,
         Description: String(l.description ?? "").slice(0, 4000),
-        AccountBasedExpenseLineDetail: {
-          AccountRef: { value: account.Id, name: account.FullyQualifiedName },
-          TaxCodeRef: { value: tc.id },
-        },
+        AccountBasedExpenseLineDetail: detail,
       });
       preview_lines.push({
         line: i + 1,
         description: l.description,
         account: `${account.AcctNum ? account.AcctNum + " " : ""}${account.FullyQualifiedName}`,
-        tax_code: `${tc.name} (${tc.purchase_rate_pct}%)`,
+        tax_code: tc ? `${tc.name} (${tc.purchase_rate_pct}%)` : "n/a (US file — tax included in line amounts)",
         amount: money(amt),
       });
     }
@@ -359,15 +370,6 @@ export async function createBill(
   }
 
   /* --- exchange rate --- */
-  // Home currency read from the company file itself, never assumed.
-  let home = realm.home_currency ?? "";
-  try {
-    const prefs = await getPreferences(realm, operator);
-    if (prefs.home_currency) home = prefs.home_currency;
-  } catch {
-    /* fall back to the stored value */
-  }
-  if (!home) return { status: "refused", message: "Could not determine the company file's home currency.", preview };
   let exchangeRate: number | undefined;
   if (currency !== home) {
     exchangeRate = a.exchange_rate;
@@ -406,8 +408,8 @@ export async function createBill(
     TxnDate: a.txn_date,
     DocNumber: doc,
     Line: lineOut,
-    GlobalTaxCalculation: "TaxExcluded",
   };
+  if (!usTaxModel) payload.GlobalTaxCalculation = "TaxExcluded";
   if (a.due_date) payload.DueDate = a.due_date;
   if (a.memo) payload.PrivateNote = String(a.memo).slice(0, 4000);
   if (currency !== home) {

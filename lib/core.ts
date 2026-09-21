@@ -136,6 +136,7 @@ export type Realm = {
   write_enabled: boolean;
   write_scope: string[] | null;
   home_currency: string | null;
+  country: string | null;
   authorised_by: string | null;
   authorised_at: string | null;
 };
@@ -471,6 +472,7 @@ export async function getPreferences(realm: Realm, operator?: string) {
                             p?.AccountingInfoPrefs?.ClassTrackingPerTxn),
     location_tracking: Boolean(p?.AccountingInfoPrefs?.TrackDepartments),
     using_sales_tax: Boolean(p?.TaxPrefs?.UsingSalesTax),
+    country: (await (async () => { try { const c = await qboQuery(realm, "select Country from CompanyInfo", operator); return c?.CompanyInfo?.[0]?.Country ?? null; } catch { return null; } })()) as string | null,
   };
 }
 
