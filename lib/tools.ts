@@ -42,6 +42,8 @@ import {
   saveRun,
 } from "./recon";
 import { setInvoiceNumber } from "./write";
+import { cardTransactions, createExpense, listCardAccounts } from "./expenses";
+
 import { REPORTS, QUERYABLE, companyInfo, financialPackage, fxRate, projectRecord, queryRecords, rowsToMarkdown, runReport } from "./reports";
 
 
@@ -906,6 +908,68 @@ export const TOOLS: {
       const disp = rows.slice(0, Number(limit ?? 200)).map((x: any) => projectRecord(String(entity), x));
       const total = rows.reduce((s: number, x: any) => s + (Number(x.TotalAmt ?? x.Amount) || 0), 0);
       return `**${r.label}** · \`${sql}\` · ${rows.length} record(s)${total ? ` · sum ${money(total)}` : ""}\n\n${table(disp)}${raw ? "\n\n```json\n" + JSON.stringify(rows) + "\n```" : ""}${READ_ONLY_BANNER}`;
+    },
+  },
+
+
+  /* ------------------------------------------------- credit card expenses */
+
+  {
+    name: "list_card_accounts",
+    description: "Active Credit Card accounts on a company file (id, name, currency). Use to pick the card for a statement reconciliation. Read only.",
+    inputSchema: { type: "object", properties: { file: { type: "string" } }, required: ["file"] },
+    handler: async ({ file }, { user }) => {
+      const r = await realmOf(file);
+      const cards = await listCardAccounts(r, user.email);
+      await audit({ realm: r.id, kind: "read", operator: user.email, tool: "list_card_accounts" });
+      return cards.length ? table(cards.map((c) => ({ Id: c.id, Account: c.name, "No.": c.number, Ccy: c.currency }))) + READ_ONLY_BANNER : `No active Credit Card accounts on ${r.label}.`;
+    },
+  },
+
+  {
+    name: "card_transactions",
+    description: "Credit card charges already recorded in QuickBooks on one card account for a date range (Purchase transactions): date, payee, amount, GL accounts, memo. Use to match a card statement line by line before creating anything. Read only.",
+    inputSchema: { type: "object", properties: { file: { type: "string" }, card_account_id: { type: "string" }, start_date: { type: "string" }, end_date: { type: "string" } }, required: ["file", "card_account_id", "start_date", "end_date"] },
+    handler: async ({ file, card_account_id, start_date, end_date }, { user }) => {
+      const r = await realmOf(file);
+      const rows = await cardTransactions(r, String(card_account_id), String(start_date), String(end_date), user.email);
+      await audit({ realm: r.id, kind: "read", operator: user.email, tool: "card_transactions", detail: { card_account_id, start_date, end_date, returned: rows.length } });
+      const total = rows.reduce((s, x) => s + (x.amount || 0), 0);
+      return `${rows.length} transaction(s) · ${money(total)}\n\n${table(rows.map((x) => ({ Id: x.id, Date: x.date, Payee: x.payee, Amount: money(x.amount, x.currency), "Doc": x.doc, Accounts: x.accounts, Memo: x.memo })))}${READ_ONLY_BANNER}`;
+    },
+  },
+
+  {
+    name: "create_expense",
+    description:
+      "Create ONE credit-card expense (QuickBooks Purchase, PaymentType CreditCard) for a statement line that has no matching entry. Dry run by default: checks the card account is an active Credit Card account, payee exists if given, every line has a postable GL (and tax code on Canadian files), lines + tax equal the statement amount to the cent, no same-card same-date same-amount entry exists, flags same-amount within 3 days. Pass apply: true only after the user confirms. Refused unless the create_expense scope is enabled on the file. Cannot pay, void, delete or touch bank accounts.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file: { type: "string" },
+        card_account: { type: "string", description: "Credit card account id, number or name (list_card_accounts)" },
+        txn_date: { type: "string", description: "Statement line date YYYY-MM-DD" },
+        payee: { type: "string", description: "Vendor id or exact display name; optional" },
+        doc_number: { type: "string", description: "Statement reference / receipt no.; optional" },
+        memo: { type: "string" },
+        currency: { type: "string" },
+        exchange_rate: { type: "number" },
+        expected_total: { type: "number", description: "Statement line amount including tax" },
+        source_doc: { type: "string" },
+        override_possible_duplicate: { type: "boolean" },
+        lines: { type: "array", minItems: 1, items: { type: "object", properties: { description: { type: "string" }, amount: { type: "number" }, account: { type: "string" }, tax_code: { type: "string" } }, required: ["description", "amount", "account"] } },
+        apply: { type: "boolean" },
+      },
+      required: ["file", "card_account", "txn_date", "lines", "expected_total"],
+    },
+    handler: async (a, { user }) => {
+      const r = await realmOf(a.file);
+      if (a.apply === true && !hasScope(r, "create_expense")) return `**Not created.** ${scopeError(r, "create_expense")}`;
+      const res = await createExpense(r, { card_account: String(a.card_account), txn_date: String(a.txn_date), payee: a.payee ? String(a.payee) : undefined, doc_number: a.doc_number ? String(a.doc_number) : undefined, memo: a.memo ? String(a.memo) : undefined, currency: a.currency ? String(a.currency) : undefined, exchange_rate: typeof a.exchange_rate === "number" ? a.exchange_rate : undefined, lines: a.lines, expected_total: Number(a.expected_total), source_doc: a.source_doc ? String(a.source_doc) : undefined, override_possible_duplicate: a.override_possible_duplicate === true, dry_run: a.apply !== true }, user.email);
+      const p = res.preview as any;
+      const block = [`**${p.card_account ?? a.card_account}** · ${p.txn_date ?? a.txn_date} · ${p.payee ?? ""} · ${p.currency ?? ""}`, p.memo ? `Memo: ${p.memo}` : "", "", Array.isArray(p.lines) && p.lines.length ? table(p.lines.map((l: any) => ({ Line: l.line, Description: l.description, "GL account": l.account, Tax: l.tax_code, Amount: l.amount }))) : "", "", p.subtotal ? `Subtotal ${p.subtotal} · Tax ${p.tax} · **Total ${p.computed_total}** (statement ${p.statement_amount})` : ""].filter((x) => x !== "").join("\n");
+      const label = res.status === "created" ? `**CREATED — Purchase ${res.purchase_id}.** ${res.message}` : res.status === "created_with_drift" ? `**CREATED, BUT CHECK IT.** ${res.message}` : res.status === "ready" ? `**READY — not yet posted.** ${res.message}` : `**NOT POSTED.** ${res.message}`;
+      return `${block}\n\n${label}`;
     },
   },
 

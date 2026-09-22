@@ -371,8 +371,8 @@ export async function qboGet(realm: Realm, path: string, operator?: string) {
  *     is an update in disguise. The caller (lib/bills.ts) owns the duplicate
  *     guard, total check and post-write verification.
  */
-export type WriteScope = "set_invoice_number" | "create_bill";
-const WRITABLE_ENTITIES = new Set(["bill"]);
+export type WriteScope = "set_invoice_number" | "create_bill" | "create_expense";
+const WRITABLE_ENTITIES = new Set(["bill", "purchase"]);
 
 export function hasScope(realm: Realm, scope: WriteScope) {
   return realm.write_enabled && Array.isArray(realm.write_scope) && realm.write_scope.includes(scope);

@@ -1,5 +1,15 @@
 # Changelog
 
+## 22 September 2026 — credit-card expenses (v0.5.0)
+
+New write scope `create_expense`: creates a QuickBooks Purchase (PaymentType CreditCard) on a
+Credit Card account for a statement line with no matching entry. Guards as create_bill (postable
+GL, tax code on Canadian files, lines + tax = statement amount, exact-duplicate refusal on card +
+date + amount, 3-day possible-duplicate flag, dry run default, post-write drift check). New read
+tools `list_card_accounts`, `card_transactions`. New table `posted_expense`. Bank accounts are not
+writable; nothing can pay, void or delete.
+
+
 ## 21 September 2026 — US tax model for create_bill (v0.4.1)
 
 `create_bill` detects a US company file (CompanyInfo.Country = US) and omits per-line

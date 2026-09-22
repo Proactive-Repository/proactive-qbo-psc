@@ -15,7 +15,7 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => ({}));
   const { file, enabled, reason, authorised_by } = body ?? {};
-  const VALID = ["set_invoice_number", "create_bill"];
+  const VALID = ["set_invoice_number", "create_bill", "create_expense"];
   const scope: string[] = Array.isArray(body?.scope) ? body.scope.map(String) : [];
   if (enabled && (!scope.length || scope.some((s) => !VALID.includes(s))))
     return Response.json(
