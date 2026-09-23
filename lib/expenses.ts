@@ -27,11 +27,14 @@ export async function listCardAccounts(realm: Realm, operator: string) {
 
 export async function cardTransactions(realm: Realm, accountId: string, start: string, end: string, operator: string) {
   const id = accountId.replace(/'/g, "");
-  const rows: any[] = await qboQueryAll(
+  // QBO does not allow filtering Purchase on AccountRef ("AccountRef is not queryable"),
+  // so pull all credit-card purchases in the window and filter to the card here.
+  const all: any[] = await qboQueryAll(
     realm,
-    `select * from Purchase where AccountRef = '${id}' and TxnDate >= '${start}' and TxnDate <= '${end}'`,
+    `select * from Purchase where PaymentType = 'CreditCard' and TxnDate >= '${start}' and TxnDate <= '${end}'`,
     "Purchase", operator, 1000,
   );
+  const rows = all.filter((p) => String(p.AccountRef?.value) === id);
   return rows.map((p) => ({
     id: p.Id, date: p.TxnDate, payee: p.EntityRef?.name ?? "", amount: Number(p.TotalAmt), currency: p.CurrencyRef?.value ?? "",
     doc: p.DocNumber ?? "", memo: (p.PrivateNote ?? "").slice(0, 60),
@@ -114,8 +117,8 @@ export async function createExpense(realm: Realm, a: CreateExpenseArgs, operator
   /* duplicates */
   const d = new Date(a.txn_date + "T00:00:00Z");
   const lo = new Date(d.getTime() - 3 * 86400000).toISOString().slice(0, 10), hi = new Date(d.getTime() + 3 * 86400000).toISOString().slice(0, 10);
-  const near = await qboQuery(realm, `select * from Purchase where AccountRef = '${card.id}' and TxnDate >= '${lo}' and TxnDate <= '${hi}'`, operator);
-  const nearRows: any[] = (near?.Purchase ?? []).filter((p: any) => Math.abs(Number(p.TotalAmt) - round2(a.expected_total)) <= 0.01);
+  const near = await qboQuery(realm, `select * from Purchase where PaymentType = 'CreditCard' and TxnDate >= '${lo}' and TxnDate <= '${hi}' maxresults 1000`, operator);
+  const nearRows: any[] = (near?.Purchase ?? []).filter((p: any) => String(p.AccountRef?.value) === String(card.id) && Math.abs(Number(p.TotalAmt) - round2(a.expected_total)) <= 0.01);
   const exact = nearRows.filter((p: any) => p.TxnDate === a.txn_date && (!payee || p.EntityRef?.value === payee.Id));
   const alsoPosted = (await db.select("posted_expense", `realm=eq.${realm.id}&card_account_id=eq.${card.id}&txn_date=eq.${a.txn_date}&total=eq.${round2(a.expected_total)}&select=qbo_purchase_id,operator,created_at`)) ?? [];
   if (exact.length || alsoPosted.length) return { status: "refused", message: `DUPLICATE. ${card.name} already has ${money(a.expected_total)} on ${a.txn_date}${payee ? " to " + payee.DisplayName : ""}: ${exact.map((p: any) => `Purchase ${p.Id} (${p.EntityRef?.name ?? "no payee"})`).join("; ")}${alsoPosted.map((p: any) => ` connector-posted ${p.qbo_purchase_id} by ${p.operator}`).join("")}. Not posted.`, preview, duplicates: exact };
