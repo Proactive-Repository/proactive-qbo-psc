@@ -46,7 +46,7 @@ export async function handleRpc(req: Request, user: ConnectorUser): Promise<Resp
           result: {
             protocolVersion: PROTOCOL,
             capabilities: { tools: { listChanged: false } },
-            serverInfo: { name: SERVER_NAME, version: "0.5.1" },
+            serverInfo: { name: SERVER_NAME, version: "0.5.2" },
             instructions: INSTRUCTIONS + ` You are signed in as ${user.full_name} (${user.email}), role ${user.role}.`,
           },
         });

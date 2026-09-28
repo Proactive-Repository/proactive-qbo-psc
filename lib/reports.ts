@@ -60,7 +60,9 @@ export type FlatRow = { level: number; kind: "data" | "section" | "summary"; lab
 export async function runReport(realm: Realm, name: ReportName, params: ReportParams, operator: string) {
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== "") qs.set(k, String(v));
-  const data = await qboGet(realm, `reports/${name}?${qs.toString()}`, operator);
+  // Intuit names the detail aging reports in the singular; the summaries are plural.
+  const API_NAME: Record<string, string> = { AgedReceivablesDetail: "AgedReceivableDetail", AgedPayablesDetail: "AgedPayableDetail" };
+  const data = await qboGet(realm, `reports/${API_NAME[name] ?? name}?${qs.toString()}`, operator);
   return { raw: data, ...flatten(data) };
 }
 
