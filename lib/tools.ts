@@ -44,6 +44,7 @@ import {
 import { setInvoiceNumber } from "./write";
 import { cardTransactions, createExpense, listCardAccounts } from "./expenses";
 
+import { applyPayment, depositAccounts, findCustomers, openInvoices } from "./payments";
 import { REPORTS, QUERYABLE, companyInfo, financialPackage, fxRate, projectRecord, queryRecords, rowsToMarkdown, runReport } from "./reports";
 
 
@@ -973,6 +974,75 @@ export const TOOLS: {
     },
   },
 
+  {
+    name: "find_customers",
+    description: "Customers on a company file by name (partial is fine) with currency and open balance. Use to identify the remitting customer before applying a payment. Read only.",
+    inputSchema: { type: "object", properties: { file: { type: "string" }, search: { type: "string" } }, required: ["file", "search"] },
+    handler: async ({ file, search }, { user }) => {
+      const r = await realmOf(file);
+      const rows = await findCustomers(r, String(search), user.email);
+      await audit({ realm: r.id, kind: "read", operator: user.email, tool: "find_customers", detail: { search } });
+      if (!rows.length) return `No active customer on ${r.label} matches "${search}".`;
+      return table(rows.map((c) => ({ Id: c.id, Customer: c.name, Ccy: c.currency, "Open balance": money(c.balance, c.currency) })));
+    },
+  },
+  {
+    name: "open_invoices",
+    description: "Open (unpaid) invoices for one customer on a company file: id, number, date, due date, total, balance. This is the list a remittance is matched against; the balances here are the expected_open_balance values apply_payment checks. Read only.",
+    inputSchema: { type: "object", properties: { file: { type: "string" }, customer_id: { type: "string" } }, required: ["file", "customer_id"] },
+    handler: async ({ file, customer_id }, { user }) => {
+      const r = await realmOf(file);
+      const rows = await openInvoices(r, String(customer_id), user.email);
+      await audit({ realm: r.id, kind: "read", operator: user.email, tool: "open_invoices", detail: { customer_id } });
+      if (!rows.length) return `Customer ${customer_id} has no open invoices on ${r.label}.`;
+      const ccy = rows[0].currency;
+      return `**${rows[0].customer}** · ${rows.length} open invoice(s) · balance ${money(rows.reduce((a, b) => a + b.balance, 0), ccy)}\n\n` + table(rows.map((i) => ({ Id: i.id, "Invoice no.": i.doc, Date: i.date, Due: i.due, Ccy: i.currency, Total: money(i.total, i.currency), Balance: money(i.balance, i.currency) })));
+    },
+  },
+  {
+    name: "deposit_accounts",
+    description: "Accounts a customer payment can be deposited to on a company file: active Bank accounts and Undeposited Funds, with currency. Read only.",
+    inputSchema: { type: "object", properties: { file: { type: "string" } }, required: ["file"] },
+    handler: async ({ file }, { user }) => {
+      const r = await realmOf(file);
+      const rows = await depositAccounts(r, user.email);
+      return table(rows.map((a) => ({ Id: a.id, Account: a.name, Type: a.type, Ccy: a.currency })));
+    },
+  },
+  {
+    name: "apply_payment",
+    description:
+      "Record ONE customer payment (QuickBooks Receive Payment) and apply it to named open invoices. Dry run by default: checks the customer exists and the currency matches, every invoice belongs to that customer and its open balance still equals expected_open_balance (from open_invoices), no line exceeds its invoice balance, lines do not exceed the payment, the deposit account is a Bank account or Undeposited Funds, and no same-customer same-date same-amount payment exists (flags same amount within 3 days). Any amount above the applied lines stays on the customer as an unapplied credit. Pass apply: true only after the user confirms. Refused unless the apply_payment scope is enabled on the file. Cannot delete, void, refund or move money.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file: { type: "string" },
+        customer_id: { type: "string" },
+        txn_date: { type: "string", description: "Payment date YYYY-MM-DD" },
+        total_amount: { type: "number", description: "Amount received" },
+        currency: { type: "string" },
+        payment_ref: { type: "string", description: "Cheque or EFT reference" },
+        deposit_account_id: { type: "string", description: "Bank account or Undeposited Funds id (deposit_accounts)" },
+        payment_method: { type: "string", description: "Optional PaymentMethod name or id, e.g. Cheque, EFT" },
+        memo: { type: "string" },
+        exchange_rate: { type: "number" },
+        source_doc: { type: "string" },
+        override_possible_duplicate: { type: "boolean" },
+        lines: { type: "array", minItems: 1, items: { type: "object", properties: { invoice_id: { type: "string" }, amount: { type: "number" }, expected_open_balance: { type: "number" } }, required: ["invoice_id", "amount", "expected_open_balance"] } },
+        apply: { type: "boolean" },
+      },
+      required: ["file", "customer_id", "txn_date", "total_amount", "deposit_account_id", "lines"],
+    },
+    handler: async (a, { user }) => {
+      const r = await realmOf(a.file);
+      if (a.apply === true && !hasScope(r, "apply_payment")) return `**Not created.** ${scopeError(r, "apply_payment")}`;
+      const res = await applyPayment(r, { customer_id: String(a.customer_id), txn_date: String(a.txn_date), total_amount: Number(a.total_amount), currency: a.currency ? String(a.currency) : undefined, payment_ref: a.payment_ref ? String(a.payment_ref) : undefined, deposit_account_id: String(a.deposit_account_id), payment_method: a.payment_method ? String(a.payment_method) : undefined, memo: a.memo ? String(a.memo) : undefined, exchange_rate: typeof a.exchange_rate === "number" ? a.exchange_rate : undefined, lines: a.lines, source_doc: a.source_doc ? String(a.source_doc) : undefined, override_possible_duplicate: a.override_possible_duplicate === true, dry_run: a.apply !== true }, user.email);
+      const p = res.preview as any;
+      const block = [`**${p.customer}** · ${p.txn_date} · ${p.currency} · ref ${p.payment_ref || "—"} · deposit to ${p.deposit_to}`, p.memo ? `Memo: ${p.memo}` : "", "", Array.isArray(p.lines) && p.lines.length ? table(p.lines.map((l: any) => ({ Line: l.line, Invoice: l.invoice, Date: l.invoice_date, "Open balance": l.open_balance, Apply: l.apply, "Remaining after": l.remaining_after }))) : "", "", `Payment ${p.total} · applied ${p.applied} · unapplied credit ${p.unapplied_credit}`].filter((x) => x !== "").join("\n");
+      const label = res.status === "created" ? `**CREATED — Payment ${res.payment_id}.** ${res.message}` : res.status === "created_with_drift" ? `**CREATED, BUT CHECK IT.** ${res.message}` : res.status === "ready" ? `**READY — not yet posted.** ${res.message}` : `**NOT POSTED.** ${res.message}`;
+      return `${block}\n\n${label}`;
+    },
+  },
   {
     name: "capture_baseline",
     description:

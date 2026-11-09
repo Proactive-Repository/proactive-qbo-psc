@@ -371,8 +371,8 @@ export async function qboGet(realm: Realm, path: string, operator?: string) {
  *     is an update in disguise. The caller (lib/bills.ts) owns the duplicate
  *     guard, total check and post-write verification.
  */
-export type WriteScope = "set_invoice_number" | "create_bill" | "create_expense";
-const WRITABLE_ENTITIES = new Set(["bill", "purchase"]);
+export type WriteScope = "set_invoice_number" | "create_bill" | "create_expense" | "apply_payment";
+const WRITABLE_ENTITIES = new Set(["bill", "purchase", "payment"]);
 
 export function hasScope(realm: Realm, scope: WriteScope) {
   return realm.write_enabled && Array.isArray(realm.write_scope) && realm.write_scope.includes(scope);
@@ -409,7 +409,7 @@ export async function qboPost(
       throw new Error("Refusing a create that carries an Id or SyncToken.");
     }
     if (!Array.isArray(payload.Line) || !(payload.Line as unknown[]).length) {
-      throw new Error("Refusing to create a bill with no lines.");
+      throw new Error("Refusing to create a transaction with no lines.");
     }
   }
   if (!realm.realm_id) throw new Error(`${realm.label} is not authorised.`);

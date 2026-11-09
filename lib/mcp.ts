@@ -17,7 +17,7 @@ export const INSTRUCTIONS =
   `Proactive's QuickBooks Online connector for ${LABEL} (project ${PROJECT_CODE}). Reads vendors, bills, ` +
   "chart of accounts and tax codes. Three tools change QuickBooks: set_invoice_number (document " +
   "number + memo on one existing bill), create_bill (one new vendor bill) and create_expense (one " +
-  "credit-card Purchase for a statement line). All default to a dry run and need apply:true. For create_bill: always " +
+  "credit-card Purchase for a statement line) and apply_payment (one customer Payment applied to named open invoices). All default to a dry run and need apply:true. For create_bill: always " +
   "run the dry run first and show the user the exact bill; every line's GL account must be " +
   "confirmed by the user; apply only after the user types 'post to qbo'; never override a " +
   "possible-duplicate flag without the user confirming it is a different invoice. Nothing " +
@@ -46,7 +46,7 @@ export async function handleRpc(req: Request, user: ConnectorUser): Promise<Resp
           result: {
             protocolVersion: PROTOCOL,
             capabilities: { tools: { listChanged: false } },
-            serverInfo: { name: SERVER_NAME, version: "0.5.2" },
+            serverInfo: { name: SERVER_NAME, version: "0.6.0" },
             instructions: INSTRUCTIONS + ` You are signed in as ${user.full_name} (${user.email}), role ${user.role}.`,
           },
         });
